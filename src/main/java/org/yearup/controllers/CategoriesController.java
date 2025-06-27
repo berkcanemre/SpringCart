@@ -1,70 +1,134 @@
 package org.yearup.controllers;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.yearup.data.CategoryDao;
-import org.yearup.data.ProductDao;
+import org.yearup.data.ProductDao; // Likely needed for search or related operations
 import org.yearup.models.Category;
-import org.yearup.models.Product;
+import org.yearup.models.Product; // Assuming you might use Product in search in future
 
 import java.util.List;
 
-// add the annotations to make this a REST controller
-// add the annotation to make this controller the endpoint for the following url
-    // http://localhost:8080/categories
-// add annotation to allow cross site origin requests
+// Marks this class as a REST controller.
+@RestController
+// Allows cross-origin requests.
+@CrossOrigin
+// Sets the base path for all endpoints.
+@RequestMapping("categories")
+@PreAuthorize("permitAll()") // Changed to permitAll to allow anonymous browsing of categories
 public class CategoriesController
 {
     private CategoryDao categoryDao;
-    private ProductDao productDao;
+    // Potentially needed for future product-related functionality within categories
+    // private ProductDao productDao;
 
+    // Constructor for dependency injection.
+    @Autowired
+    public CategoriesController(CategoryDao categoryDao) //, ProductDao productDao)
+    {
+        this.categoryDao = categoryDao;
+        // this.productDao = productDao;
+    }
 
-    // create an Autowired controller to inject the categoryDao and ProductDao
-
-    // add the appropriate annotation for a get action
+    // GET: http://localhost:8080/categories
+    @GetMapping
     public List<Category> getAll()
     {
-        // find and return all categories
-        return null;
+        try
+        {
+            return categoryDao.getAllCategories();
+        }
+        catch(Exception ex)
+        {
+            // For any unexpected server errors, return a generic 500.
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Oops... our bad.", ex);
+        }
     }
 
-    // add the appropriate annotation for a get action
+    // GET: http://localhost:8080/categories/{id}
+    @GetMapping("{id}")
     public Category getById(@PathVariable int id)
     {
-        // get the category by id
-        return null;
+        try
+        {
+            Category category = categoryDao.getById(id);
+            if (category == null)
+            {
+                // If category is not found by DAO, return 404 Not Found.
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found.");
+            }
+            return category;
+        }
+        catch(ResponseStatusException rse)
+        {
+            // If the DAO explicitly throws a ResponseStatusException (e.g., 404 from getById),
+            // re-throw it directly without changing the status.
+            throw rse;
+        }
+        catch(Exception ex)
+        {
+            // For any other unexpected exceptions, wrap them in a generic 500.
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Oops... our bad.", ex);
+        }
     }
 
-    // the url to return all products in category 1 would look like this
-    // https://localhost:8080/categories/1/products
-    @GetMapping("{categoryId}/products")
-    public List<Product> getProductsById(@PathVariable int categoryId)
-    {
-        // get a list of product by categoryId
-        return null;
-    }
-
-    // add annotation to call this method for a POST action
-    // add annotation to ensure that only an ADMIN can call this function
+    // POST: http://localhost:8080/categories
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED) // Returns 201 Created on successful creation.
+    @PreAuthorize("hasRole('ADMIN')") // Only admins can create categories.
     public Category addCategory(@RequestBody Category category)
     {
-        // insert the category
-        return null;
+        try
+        {
+            return categoryDao.create(category);
+        }
+        catch(Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create category.", ex);
+        }
     }
 
-    // add annotation to call this method for a PUT (update) action - the url path must include the categoryId
-    // add annotation to ensure that only an ADMIN can call this function
+    // PUT: http://localhost:8080/categories/{id}
+    @PutMapping("{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Only admins can update categories.
     public void updateCategory(@PathVariable int id, @RequestBody Category category)
     {
-        // update the category by id
+        try
+        {
+            categoryDao.update(id, category);
+        }
+        catch (ResponseStatusException rse)
+        {
+            // Re-throw specific status exceptions like 404 if the category to update is not found.
+            throw rse;
+        }
+        catch(Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to update category.", ex);
+        }
     }
 
-
-    // add annotation to call this method for a DELETE action - the url path must include the categoryId
-    // add annotation to ensure that only an ADMIN can call this function
+    // DELETE: http://localhost:8080/categories/{id}
+    @DeleteMapping("{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT) // Returns 204 No Content on successful deletion.
+    @PreAuthorize("hasRole('ADMIN')") // Only admins can delete categories.
     public void deleteCategory(@PathVariable int id)
     {
-        // delete the category by id
+        try
+        {
+            categoryDao.delete(id);
+        }
+        catch (ResponseStatusException rse)
+        {
+            // Re-throw specific status exceptions like 404 if the category to delete is not found.
+            throw rse;
+        }
+        catch(Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to delete category.", ex);
+        }
     }
 }
